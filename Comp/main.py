@@ -2,59 +2,36 @@ import random
 
 from Pyro4 import expose
 
-class Point:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
+def point_in_polygon(polygon, point):
+    """
+    Raycasting Algorithm to find out whether a point is in a given polygon.
+    Performs the even-odd-rule Algorithm to find out whether a point is in a given polygon.
+    This runs in O(n) where n is the number of edges of the polygon.
+     *
+    :param polygon: an array representation of the polygon where polygon[i][0] is the x Value of the i-th point and polygon[i][1] is the y Value.
+    :param point:   an array representation of the point where point[0] is its x Value and point[1] is its y Value
+    :return: whether the point is in the polygon (not on the edge, just turn < into <= and > into >= for that)
+    """
 
-    def __str__(self):
-        return f'[x: {self.x}, y: {self.y}]'
+    # A point is in a polygon if a line from the point to infinity crosses the polygon an odd number of times
+    odd = False
+    # For each edge (In this case for each point of the polygon and the previous one)
+    i = 0
+    j = len(polygon) - 1
+    while i < len(polygon) - 1:
+        i = i + 1
+        # If a line from the point into infinity crosses this edge
+        # One point needs to be above, one below our y coordinate
+        # ...and the edge doesn't cross our Y corrdinate before our x coordinate (but between our x coordinate and infinity)
 
-class Line:
-    def __init__(self, p1, p2):
-        self.p1 = p1
-        self.p2 = p2
-
-def onLine(l1, p):
-    if (
-        p.x <= max(l1.p1.x, l1.p2.x)
-        and p.x <= min(l1.p1.x, l1.p2.x)
-        and (p.y <= max(l1.p1.y, l1.p2.y) and p.y <= min(l1.p1.y, l1.p2.y))
-    ):
-        return True
-    return False
-
-def direction(a, b, c):
-    val = (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y)
-    if val == 0:
-        return 0
-    elif val < 0:
-        return 2
-    return 1
-
-def isIntersect(l1, l2):
-    dir1 = direction(l1.p1, l1.p2, l2.p1)
-    dir2 = direction(l1.p1, l1.p2, l2.p2)
-    dir3 = direction(l2.p1, l2.p2, l1.p1)
-    dir4 = direction(l2.p1, l2.p2, l1.p2)
-
-    if dir1 != dir2 and dir3 != dir4:
-        return True
-
-    if dir1 == 0 and onLine(l1, l2.p1):
-        return True
-
-    if dir2 == 0 and onLine(l1, l2.p2):
-        return True
-
-    if dir3 == 0 and onLine(l2, l1.p1):
-        return True
-
-    if dir4 == 0 and onLine(l2, l1.p2):
-        return True
-
-    return False
-
+        if (((polygon[i][1] > point[1]) != (polygon[j][1] > point[1])) and (point[0] < (
+                (polygon[j][0] - polygon[i][0]) * (point[1] - polygon[i][1]) / (polygon[j][1] - polygon[i][1])) +
+                                                                            polygon[i][0])):
+            # Invert odd
+            odd = not odd
+        j = i
+    # If the number of crossings was odd, the point is in the polygon
+    return odd
 
 class Solver:
     def __init__(self, workers = None, input_file_name = None, output_file_name = None):
@@ -70,8 +47,6 @@ class Solver:
         # self.write_output('\n')
         worker_amount = len(self.workers)
 
-        mapped = []
-
         mapped = [None] * worker_amount
 
         for i in range(0, worker_amount):
@@ -84,16 +59,17 @@ class Solver:
     @staticmethod
     @expose
     def mymap(a, b):
-        polygon = [Point(0, 0), Point(200, 0), Point(100, 100), Point(0, 100)]
+        polygon = [(0, 0), (200, 0), (100, 100), (0, 100)]
         n = 4
         points = []
         for _ in range(a, b):
-            point = Point(random.randint(0, 400), random.randint(0, 400))
+            point = (random.randint(0, 300), random.randint(0, 300))
             points.append(point)
 
         result = []
         for i in range(len(points)):
-            if Solver.checkInside(polygon, n, points[i]):
+            # if Solver.checkInside(polygon, n, points[i]):
+            if point_in_polygon(polygon, points[i]):
                 is_inside = " is inside of polygon"
             else:
                 is_inside = " is outside of polygon"
@@ -109,28 +85,6 @@ class Solver:
             output.extend(x.value)
         return output
 
-    @staticmethod
-    @expose
-    def checkInside(poly, n, p):
-        if n < 3:
-            return False
-
-        exline = Line(p, Point(9999, p.y))
-        count = 0
-        i = 0
-        while True:
-            side = Line(poly[i], poly[(i + 1) % n])
-            if isIntersect(side, exline):
-                if direction(side.p1, p, side.p2) == 0:
-                    return onLine(side, p)
-                count += 1
-
-            i = (i + 1) % n
-            if i == 0:
-                break
-
-        return count & 1
-
     def read_input(self):
         f = open(self.input_file_name, 'r')
         line = f.readline()
@@ -141,7 +95,7 @@ class Solver:
         file = open(self.output_file_name, 'w')
         for element in output:
             file.write(str(element))
-            file.write("\n")
+            # file.write("\n")
         file.close()
         # f = open(self.output_file_name, 'a')
         # f.write(str(output) + '\n')
@@ -149,6 +103,6 @@ class Solver:
 
 if __name__ == '__main__':
      master = Solver([Solver(), Solver()],
-     "/Users/alexandrtotskiy/Developer/Comp/input.txt",
-                     "/working/output.txt")
+                     "/Users/alexandrtotskiy/Developer/Distributed-processing-systems/Comp/input.txt",
+                     "/Users/alexandrtotskiy/Developer/Distributed-processing-systems/Comp/output.txt")
      master.solve()
